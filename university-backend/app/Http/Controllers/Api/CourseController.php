@@ -107,6 +107,52 @@ class CourseController extends Controller
         $courses = Course::where('is_active', true)->get();
         return response()->json($courses);
     }
+
+    /**
+     * LIST INSTRUCTOR COURSES
+     */
+    #[OA\Get(
+        path: '/api/instructor/courses',
+        summary: 'List active courses for the authenticated instructor',
+        tags: ['Courses'],
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'List of instructor courses',
+                content: new OA\JsonContent(
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'course_id', type: 'integer', example: 1),
+                            new OA\Property(property: 'title', type: 'string', example: 'Introduction to Computer Science'),
+                            new OA\Property(property: 'code', type: 'string', example: 'CS101'),
+                            new OA\Property(property: 'is_active', type: 'boolean', example: true),
+                        ]
+                    )
+                )
+            )
+        ]
+    )]
+    public function instructorCourses(Request $request)
+    {
+        $user = $request->user();
+
+        // Only Instructors (2) or Admins (1) can use this, though mainly for instructors
+        if ($user->role_id == 3) {
+            return response()->json(['error' => 'Students do not have instructor courses.'], 403);
+        }
+
+        $query = Course::where('is_active', true);
+
+        if ($user->role_id == 2) {
+            $query->where('instructor_id', $user->id);
+        }
+
+        $courses = $query->get();
+        return response()->json($courses);
+    }
+
     /**
      * DELETE COURSE
      * (Only Admin or the course instructor can delete)

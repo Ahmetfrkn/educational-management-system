@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\StatsController;
+use App\Http\Controllers\Api\MessageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/courses', [CourseController::class, 'index']);
     Route::post('/courses', [CourseController::class, 'store']);
     Route::delete('/courses/{course_id}', [CourseController::class, 'destroy']);
+    Route::get('/instructor/courses', [CourseController::class, 'instructorCourses']);
 
     // Assignments
     Route::post('/assignments', [AssignmentController::class, 'store']);
@@ -43,6 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/student/{student_id}/courses', [EnrollmentController::class, 'studentCourses']);
     Route::get('/courses/{course_id}/students', [EnrollmentController::class, 'getCourseStudents']);
     Route::delete('/enrollments/{enrollment_id}', [EnrollmentController::class, 'destroy']);
+    Route::put('/enrollments/{enrollment_id}/grade', [EnrollmentController::class, 'updateGrade']);
 
     // Submissions
     Route::post('/submissions', [SubmissionController::class, 'store']);
@@ -56,4 +59,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Stats
     Route::get('/stats', [StatsController::class, 'index']);
+
+    // Messages
+    Route::get('/messages/unread-count', [MessageController::class, 'unreadCount']);
+    Route::get('/messages/recipients', [MessageController::class, 'recipients']);
+    Route::get('/messages/inbox', [MessageController::class, 'inbox']);
+    Route::get('/messages/sent', [MessageController::class, 'sent']);
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::get('/messages/{id}', [MessageController::class, 'show']);
+    Route::delete('/messages/{id}', [MessageController::class, 'destroy']);
 });

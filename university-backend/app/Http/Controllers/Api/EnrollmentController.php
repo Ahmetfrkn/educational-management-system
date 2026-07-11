@@ -143,9 +143,14 @@ class EnrollmentController extends Controller
             )
         ]
     )]
-    public function studentCourses($student_id)
+    public function studentCourses(Request $request, $student_id)
     {
-        $enrollments = Enrollment::with('course')
+        $user = $request->user();
+        if ($user->role_id == 3 && $user->id != $student_id) {
+            return response()->json(['error' => 'You can only view your own courses.'], 403);
+        }
+
+        $enrollments = Enrollment::with(['course.instructor:id,name'])
             ->where('student_id', $student_id)
             ->get();
 
@@ -250,5 +255,96 @@ class EnrollmentController extends Controller
         $enrollment->delete();
 
         return response()->json(['message' => 'Unenrolled successfully']);
+    }
+
+    /**
+     * UPDATE GRADE
+     */
+    #[OA\Put(
+        path: '/api/enrollments/{enrollment_id}/grade',
+        summary: 'Update student grade (Admin/Instructor only)',
+        tags: ['Enrollment'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(
+                name: 'enrollment_id',
+                in: 'path',
+                required: true,
+                description: 'ID of the enrollment',
+                schema: new OA\Schema(type: 'integer')
+            )
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['final_grade'],
+                properties: [
+                    new OA\Property(property: 'final_grade', type: 'number', format: 'float', example: 85.5)
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Grade updated successfully'),
+            new OA\Response(response: 403, description: 'Forbidden'),
+            new OA\Response(response: 404, description: 'Enrollment not found'),
+            new OA\Response(response: 422, description: 'Validation Error')
+        ]
+    )]
+    public function updateGrade(Request $request, $enrollment_id)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'final_grade' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $enrollment = Enrollment::with(['course', 'student'])->findOrFail($enrollment_id);
+
+        // Check permission: Admin or Course Instructor
+        if ($user->role_id != 1 && $enrollment->course->instructor_id != $user->id) {
+            return response()->json(['error' => 'You do not have permission to grade this student.'], 403);
+        }
+
+        $oldGrade = $enrollment->final_grade;
+        $newGrade = $request->input('final_grade');
+
+        // Prevent duplicate logs if there's no actual change
+        if ($oldGrade !== null && floatval($oldGrade) === floatval($newGrade)) {
+            return response()->json([
+                'message' => 'Grade remains unchanged.',
+                'enrollment' => $enrollment
+            ]);
+        }
+
+        $enrollment->final_grade = $newGrade;
+        $enrollment->save();
+
+        // Audit Log
+        AuditLog::create([
+            'actor_user_id' => $user->id,
+            'action_type' => 'UPDATE_GRADE',
+            'entity_type' => 'Enrollments',
+            'entity_id' => $enrollment->enrollment_id,
+            'before_json' => json_encode([
+                'final_grade' => $oldGrade,
+                'student_id' => $enrollment->student_id,
+                'student_name' => $enrollment->student->name ?? 'Unknown Student',
+                'course_id' => $enrollment->course_id,
+                'course_name' => $enrollment->course->title ?? 'Unknown Course'
+            ]),
+            'after_json' => json_encode([
+                'final_grade' => $enrollment->final_grade,
+                'student_id' => $enrollment->student_id,
+                'student_name' => $enrollment->student->name ?? 'Unknown Student',
+                'course_id' => $enrollment->course_id,
+                'course_name' => $enrollment->course->title ?? 'Unknown Course'
+            ]),
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'message' => 'Grade updated successfully',
+            'enrollment' => $enrollment
+        ]);
     }
 }

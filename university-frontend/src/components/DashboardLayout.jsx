@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getUnreadCount } from "../api/messages";
 import {
     LayoutDashboard,
     BookOpen,
@@ -9,13 +11,18 @@ import {
     X,
     Bell,
     Search,
-    User
+    User,
+    Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import Courses from "./Courses";
 import AuditLogs from "./AuditLogs";
+import Messages from "./Messages";
+
+import Academic from "./Academic";
 
 // Note: DropdownMenu might not be installed yet, I'll check and use simpler components if needed,
 // but for now I'll assume standard Shadcn components or create minimalist versions.
@@ -23,6 +30,13 @@ import AuditLogs from "./AuditLogs";
 export default function DashboardLayout({ children, role, onLogout }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [activeView, setActiveView] = useState("dash");
+
+    const { data: unreadData } = useQuery({
+        queryKey: ["messages", "unreadCount"],
+        queryFn: getUnreadCount,
+        refetchInterval: 30000,
+    });
+    const unreadCount = unreadData?.unread_count || 0;
 
     const getRoleName = () => {
         if (role === 1) return "Admin";
@@ -35,6 +49,7 @@ export default function DashboardLayout({ children, role, onLogout }) {
         { icon: LayoutDashboard, label: "Dashboard", id: "dash" },
         { icon: BookOpen, label: "Courses", id: "courses" },
         { icon: GraduationCap, label: "Academic", id: "academic" },
+        { icon: Mail, label: "Messages", id: "messages" },
         { icon: Settings, label: "Settings", id: "settings" },
     ];
 
@@ -82,6 +97,11 @@ export default function DashboardLayout({ children, role, onLogout }) {
                             >
                                 {item.icon && <item.icon className={cn("w-5 h-5 shrink-0", activeView === item.id ? "text-primary" : "group-hover:text-foreground")} />}
                                 {isSidebarOpen && <span className="ml-3 transition-opacity duration-300">{item.label}</span>}
+                                {isSidebarOpen && item.id === "messages" && unreadCount > 0 && (
+                                    <Badge className="ml-auto bg-primary text-primary-foreground border-none text-[10px] font-black rounded-full px-2 py-0">
+                                        {unreadCount}
+                                    </Badge>
+                                )}
                                 {!isSidebarOpen && (
                                     <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap shadow-md border">
                                         {item.label}
@@ -132,7 +152,12 @@ export default function DashboardLayout({ children, role, onLogout }) {
                     </div>
 
                     <div className="flex items-center gap-2">
-
+                        <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground" onClick={() => setActiveView("messages")}>
+                            <Bell size={20} />
+                            {unreadCount > 0 && (
+                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                            )}
+                        </Button>
                         <Separator orientation="vertical" className="h-6 mx-2" />
 
                         <div className="flex items-center gap-3 pl-2">
@@ -151,21 +176,18 @@ export default function DashboardLayout({ children, role, onLogout }) {
                 <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 lg:p-10 scroll-smooth">
                     <div className="max-w-7xl mx-auto space-y-8 pb-10">
                         {activeView === "dash" && children}
+                        {activeView === "messages" && (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <Messages />
+                            </div>
+                        )}
                         {activeView === "courses" && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <h1 className="text-3xl font-black mb-6 italic">All <span className="text-primary not-italic">Courses</span></h1>
                                 <Courses />
                             </div>
                         )}
-                        {activeView === "academic" && (
-                            <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 animate-in fade-in zoom-in-95 duration-500">
-                                <div className="p-6 bg-primary/5 rounded-[2.5rem] text-primary border-2 border-dashed border-primary/20">
-                                    <GraduationCap size={64} className="animate-pulse" />
-                                </div>
-                                <h2 className="text-2xl font-black">Academic Module</h2>
-                                <p className="text-muted-foreground font-medium text-center max-w-sm">Course schedules and grading systems will be available here soon.</p>
-                            </div>
-                        )}
+                        {activeView === "academic" && <Academic />}
                         {activeView === "settings" && (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-2xl mx-auto">
                                 <div className="p-10 bg-background rounded-[2.5rem] border shadow-xl space-y-8">
